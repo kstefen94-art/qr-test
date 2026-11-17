@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>QR 발급</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, system-ui, sans-serif; color: #192b3a; background: #edf4f8; }
+    body { margin: 0; padding: 5vh 1rem; }
+    main { box-sizing: border-box; max-width: 28rem; margin: auto; background: white; padding: clamp(1.4rem, 6vw, 2.4rem); border-radius: 1rem; box-shadow: 0 9px 25px #193c5317; }
+    h1 { font-size: 1.7rem; margin: 0 0 .6rem; }
+    p { line-height: 1.6; color: #435666; }
+    form { display: grid; gap: .7rem; margin-top: 1.5rem; }
+    label { font-weight: 650; }
+    input, button { box-sizing: border-box; width: 100%; border-radius: .5rem; padding: .75rem .85rem; font: inherit; }
+    input { border: 1px solid #8b9ead; }
+    button { margin-top: .55rem; background: #124d70; color: white; border: 0; font-weight: 650; cursor: pointer; }
+    small { margin-top: .5rem; line-height: 1.55; color: #435666; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>QR 발급</h1>
+    <p>이름과 사번을 입력하면 오리 이미지를 여는 QR이 발급돼요.</p>
+    <form action="https://qr-issuer.kstefen94.workers.dev/issue" method="post" autocomplete="off">
+      <label for="employee-name">이름</label>
+      <input id="employee-name" name="employee_name" maxlength="40" required>
+      <label for="employee-number">사번</label>
+      <input id="employee-number" name="employee_number" maxlength="32" pattern="[A-Za-z0-9_-]{1,32}" title="영문, 숫자, 밑줄, 하이픈을 입력해 주세요" required>
+      <button type="submit">QR 발급</button>
+      <small>입력한 이름·사번과 QR 발급 시각이 저장돼요. QR 링크를 열면 접속 시각과 IP의 일부가 해당 QR에 연결돼요.</small>
+    </form>
+  </main>
+</body>
+</html>

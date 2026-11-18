@@ -28,37 +28,117 @@
     .image-card .image-error { grid-column: 1 / -1; color: #963b2c; font-size: .85rem; }
     #status { font-size: .9rem; margin: 0; }
     small { margin-top: .5rem; line-height: 1.55; color: #435666; }
+    [hidden] { display: none !important; }
+    main:has(#gallery-panel[hidden]) { max-width: 30rem; }
+    .step { font-size: .85rem; color: #46708b; font-weight: 650; margin: 0 0 .7rem; }
+    .identity { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .8rem; padding: .8rem 1rem; background: #edf4f8; border-radius: .6rem; }
+    .identity p { margin: 0; }
+    .identity button { width: auto; margin: 0; padding: .45rem .7rem; background: white; color: #124d70; border: 1px solid #b8ccd9; font-size: .9rem; }
+    #login-error { color: #963b2c; margin: 0; font-size: .9rem; }
   </style>
 </head>
 <body>
   <main>
-    <h1>이미지 QR 발급</h1>
-    <p>공유할 이미지를 고르고 이름과 사번을 입력해 주세요.</p>
-    <form action="https://qr-issuer.kstefen94.workers.dev/issue" method="post" autocomplete="off">
+    <section id="login-panel" aria-labelledby="login-title">
+      <p class="step">1 / 2 · 발급자 정보 입력</p>
+      <h1 id="login-title">이미지 QR 로그인</h1>
+      <p>이름과 사번을 입력하면 공유할 이미지를 선택할 수 있어요.</p>
+      <form id="login-form" autocomplete="off">
+        <label for="employee-name">이름</label>
+        <input id="employee-name" maxlength="40" required>
+        <label for="employee-number">사번</label>
+        <input id="employee-number" maxlength="32" pattern="[A-Za-z0-9_\-]{1,32}" title="영문, 숫자, 밑줄, 하이픈을 입력해 주세요" required>
+        <p id="login-error" role="alert"></p>
+        <button type="submit">로그인</button>
+        <small>입력한 정보를 QR 발급자 정보로 사용해요. 재직 여부를 확인하는 직원 인증 기능은 포함되어 있지 않아요.</small>
+      </form>
+    </section>
+    <section id="gallery-panel" aria-labelledby="gallery-title" hidden>
+      <p class="step">2 / 2 · 이미지 선택</p>
+      <h1 id="gallery-title" tabindex="-1">이미지 QR 발급</h1>
+      <p>공유할 이미지를 선택하고 QR을 발급해 주세요.</p>
+      <div class="identity">
+        <p id="issuer-summary"></p>
+        <button id="logout-button" type="button">로그아웃</button>
+      </div>
+    <form id="issue-form" action="https://qr-issuer.kstefen94.workers.dev/issue" method="post" autocomplete="off">
+      <input type="hidden" id="issuer-name" name="employee_name">
+      <input type="hidden" id="issuer-number" name="employee_number">
       <fieldset id="image-fieldset" aria-describedby="status" disabled>
         <legend>이미지 선택</legend>
         <div id="image-options"></div>
       </fieldset>
       <p id="status" role="status" aria-live="polite">이미지 목록을 불러오는 중이에요.</p>
-      <label for="employee-name">이름</label>
-      <input id="employee-name" name="employee_name" maxlength="40" required>
-      <label for="employee-number">사번</label>
-      <input id="employee-number" name="employee_number" maxlength="32" pattern="[A-Za-z0-9_\-]{1,32}" title="영문, 숫자, 밑줄, 하이픈을 입력해 주세요" required>
       <button id="issue-button" type="submit" disabled>QR 발급</button>
       <small>이름·사번, 선택한 이미지와 발급 시각이 저장돼요. QR 링크를 열면 접속 시각과 IP 일부가 해당 이미지에 연결돼요.</small>
     </form>
+    </section>
   </main>
   <script type="module">
-    const form = document.querySelector('form');
+    const form = document.querySelector('#issue-form');
     const imageFieldset = document.querySelector('#image-fieldset');
     const imageOptions = document.querySelector('#image-options');
     const status = document.querySelector('#status');
     const issueButton = document.querySelector('#issue-button');
+    const loginForm = document.querySelector('#login-form');
+    const loginPanel = document.querySelector('#login-panel');
+    const galleryPanel = document.querySelector('#gallery-panel');
+    const nameInput = document.querySelector('#employee-name');
+    const numberInput = document.querySelector('#employee-number');
+    const issuerName = document.querySelector('#issuer-name');
+    const issuerNumber = document.querySelector('#issuer-number');
+    const issuerSummary = document.querySelector('#issuer-summary');
+    const loginError = document.querySelector('#login-error');
+    let imagesLoaded = false;
+    let imagesLoading = false;
+
+    loginForm.addEventListener('submit', event => {
+      event.preventDefault();
+      const name = nameInput.value.trim().normalize('NFC');
+      const number = numberInput.value.trim().toUpperCase();
+      if (!/^[\p{L}\p{M} .'-]{1,40}$/u.test(name) || !/^[A-Z0-9_-]{1,32}$/.test(number)) {
+        loginError.textContent = '이름은 40자 이내, 사번은 영문·숫자·밑줄·하이픈으로 입력해 주세요.';
+        return;
+      }
+      issuerName.value = name;
+      issuerNumber.value = number;
+      issuerSummary.textContent = `${name} · ${number}`;
+      loginError.textContent = '';
+      loginPanel.hidden = true;
+      galleryPanel.hidden = false;
+      document.querySelector('#gallery-title').focus();
+      if (!imagesLoaded && !imagesLoading) loadImages();
+    });
+
+    document.querySelector('#logout-button').addEventListener('click', () => {
+      form.reset();
+      issuerName.value = '';
+      issuerNumber.value = '';
+      issuerSummary.textContent = '';
+      issueButton.disabled = true;
+      loginForm.reset();
+      loginError.textContent = '';
+      galleryPanel.hidden = true;
+      loginPanel.hidden = false;
+      if (imagesLoaded) status.textContent = '위에서 이미지를 선택해 주세요.';
+      nameInput.focus();
+    });
+
+    form.addEventListener('submit', event => {
+      if (galleryPanel.hidden || !issuerName.value || !issuerNumber.value) {
+        event.preventDefault();
+        nameInput.focus();
+      }
+    });
     imageOptions.addEventListener('change', () => {
       issueButton.disabled = !form.querySelector('input[name="image_id"]:checked:not(:disabled)');
       status.textContent = issueButton.disabled ? '이미지를 선택해 주세요.' : '';
     });
 
+    async function loadImages() {
+      imagesLoading = true;
+      status.textContent = '이미지 목록을 불러오는 중이에요.';
+      imageOptions.replaceChildren();
     try {
       const endpoint = new URL('/images', form.action);
       const response = await fetch(endpoint, { cache: 'no-store' });
@@ -107,9 +187,13 @@
         thumbnail.src = image.url;
       });
       imageFieldset.disabled = images.length === 0;
+      imagesLoaded = true;
       status.textContent = images.length ? '위에서 이미지를 선택해 주세요.' : '현재 발급할 수 있는 이미지가 없어요.';
     } catch {
       status.textContent = '이미지 목록을 불러올 수 없어요. 잠시 후 페이지를 새로고침해 주세요.';
+    } finally {
+      imagesLoading = false;
+    }
     }
   </script>
 </body>

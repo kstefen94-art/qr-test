@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="strict-origin-when-cross-origin">
-  <title>QR 발급</title>
+  <title>이미지 QR 발급</title>
   <style>
     :root { color-scheme: light; font-family: Inter, system-ui, sans-serif; color: #192b3a; background: #edf4f8; }
     body { margin: 0; padding: 5vh 1rem; }
@@ -13,24 +13,88 @@
     p { line-height: 1.6; color: #435666; }
     form { display: grid; gap: .7rem; margin-top: 1.5rem; }
     label { font-weight: 650; }
-    input, button { box-sizing: border-box; width: 100%; border-radius: .5rem; padding: .75rem .85rem; font: inherit; }
-    input { border: 1px solid #8b9ead; }
+    input, select, button { box-sizing: border-box; width: 100%; border-radius: .5rem; padding: .75rem .85rem; font: inherit; }
+    input, select { border: 1px solid #8b9ead; background: white; color: inherit; }
     button { margin-top: .55rem; background: #124d70; color: white; border: 0; font-weight: 650; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: wait; }
+    #preview { max-width: 100%; max-height: 14rem; object-fit: contain; margin: .4rem auto; }
+    #status { font-size: .9rem; margin: 0; }
     small { margin-top: .5rem; line-height: 1.55; color: #435666; }
   </style>
 </head>
 <body>
   <main>
-    <h1>QR 발급</h1>
-    <p>이름과 사번을 입력하면 오리 이미지를 여는 QR이 발급돼요.</p>
+    <h1>이미지 QR 발급</h1>
+    <p>이름과 사번을 입력하고 공유할 이미지를 선택해 주세요.</p>
     <form action="https://qr-issuer.kstefen94.workers.dev/issue" method="post" autocomplete="off">
       <label for="employee-name">이름</label>
       <input id="employee-name" name="employee_name" maxlength="40" required>
       <label for="employee-number">사번</label>
       <input id="employee-number" name="employee_number" maxlength="32" pattern="[A-Za-z0-9_-]{1,32}" title="영문, 숫자, 밑줄, 하이픈을 입력해 주세요" required>
-      <button type="submit">QR 발급</button>
-      <small>입력한 이름·사번과 QR 발급 시각이 저장돼요. QR 링크를 열면 접속 시각과 IP의 일부가 해당 QR에 연결돼요.</small>
+      <label for="image-choice">이미지</label>
+      <select id="image-choice" name="image_id" required disabled>
+        <option value="">이미지 목록을 불러오는 중이에요</option>
+      </select>
+      <img id="preview" alt="" hidden>
+      <p id="status" role="status" aria-live="polite"></p>
+      <button id="issue-button" type="submit" disabled>QR 발급</button>
+      <small>이름·사번, 선택한 이미지와 발급 시각이 저장돼요. QR 링크를 열면 접속 시각과 IP 일부가 해당 이미지에 연결돼요.</small>
     </form>
   </main>
+  <script type="module">
+    const imageChoice = document.querySelector('#image-choice');
+    const preview = document.querySelector('#preview');
+    const status = document.querySelector('#status');
+    const issueButton = document.querySelector('#issue-button');
+    const imageStatus = { images: [] };
+
+    imageChoice.addEventListener('change', () => {
+      const image = imageStatus.images.find(item => item.id === imageChoice.value);
+      preview.hidden = true;
+      issueButton.disabled = true;
+      status.textContent = image ? '이미지를 불러오는 중이에요.' : '이미지를 선택해 주세요.';
+      if (image) {
+        preview.alt = image.name + ' 미리보기';
+        preview.src = image.url;
+      }
+    });
+    preview.addEventListener('load', () => {
+      const selected = imageStatus.images.find(item => item.id === imageChoice.value);
+      if (!selected || preview.src !== selected.url) return;
+      preview.hidden = false;
+      issueButton.disabled = false;
+      status.textContent = '';
+    });
+    preview.addEventListener('error', () => {
+      preview.hidden = true;
+      issueButton.disabled = true;
+      status.textContent = '이미지 파일을 열 수 없어요. 다른 이미지를 선택해 주세요.';
+    });
+
+    try {
+      const endpoint = new URL('/images', document.querySelector('form').action);
+      const response = await fetch(endpoint, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Image list unavailable');
+      const payload = await response.json();
+      if (!Array.isArray(payload.images)) throw new Error('Invalid image list');
+      imageStatus.images = payload.images.filter(image => {
+        if (!image || typeof image.id !== 'string' || typeof image.name !== 'string' || typeof image.url !== 'string') return false;
+        try {
+          const url = new URL(image.url);
+          return /^[A-Za-z0-9_-]{1,64}$/.test(image.id) &&
+            url.origin === 'https://kstefen94-art.github.io' && url.pathname.startsWith('/qr-test/');
+        } catch {
+          return false;
+        }
+      });
+      imageChoice.replaceChildren(new Option('이미지를 선택해 주세요', ''));
+      imageStatus.images.forEach(image => imageChoice.add(new Option(image.name, image.id)));
+      imageChoice.disabled = imageStatus.images.length === 0;
+      status.textContent = imageStatus.images.length ? '' : '현재 발급할 수 있는 이미지가 없어요.';
+    } catch {
+      imageChoice.replaceChildren(new Option('이미지 목록을 불러올 수 없어요', ''));
+      status.textContent = '잠시 후 페이지를 새로고침해 주세요.';
+    }
+  </script>
 </body>
 </html>
